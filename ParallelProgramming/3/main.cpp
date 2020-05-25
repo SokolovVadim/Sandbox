@@ -9,27 +9,32 @@
 #include <iomanip>
 #include <cmath>
 
-const int NUMBER = 4; //number of threads
+enum COMPONENTS
+{
+    NUMBER = 4, // thread num
+    DENOMINATOR = 1000000000 // sec -> nanosec
+}; 
 
 static double RESULT = 0; //result of integration
 
-//integrate from A to B with aertain GRid
+//integrate from A to B with aertain Grid
 static double A = 0;
 static double B = 0;
-static long   GRid = 0;
+static long   Grid = 0;
 
 struct Arg
 {
     int id;
-    int time;
+    double time;
     pthread_mutex_t *mutex;
 };
 
-void* thread_routine(void *Arg); //function for each thread
-double function(const double x); //function that will be integrated
+void*  thread_routine(void *Arg);
+double function(const double x); //function to be integrated
 
 int main(int Argc, char **Argv, char **env) {
-    //check input Argument
+    // Input check
+
     if(Argc != 1) {
         std::cout << "Invalid input: no Argument is needed!\n";
         return EXIT_FAILURE;
@@ -40,19 +45,19 @@ int main(int Argc, char **Argv, char **env) {
     std::cin >> A;
     std::cout << "Enter B = ";
     std::cin >> B;
-    std::cout << "Enter number of nodes (GRid > 1) = ";
-    std::cin >> GRid;
+    std::cout << "Enter NUMBER of nodes (Grid > 1) = ";
+    std::cin >> Grid;
 
-    if((A >= B) || (GRid <= 1)) {
-        std::cout << "Invalid numbers (input)\n";
+    if((A >= B) || (Grid <= 1)) {
+        std::cout << "Invalid NUMBERs (input)\n";
         return EXIT_FAILURE;
     }
 
     //timer
-    struct timespec BEGIN, END; //-lrt key is needed -> time_t tv_sec and long tv_nsec
-    double TIMER;
+    struct timespec begin, end; 
+    double timer;
 
-    clock_gettime(CLOCK_REALTIME, &BEGIN);
+    clock_gettime(CLOCK_REALTIME, &begin);
 
     //id = [0, 1, 2, ..., NUMBER - 1]
     int *id = new int[NUMBER];
@@ -72,7 +77,7 @@ int main(int Argc, char **Argv, char **env) {
 
     //mutex to avoid collisions
     pthread_mutex_t mutex;
-    pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&mutex, nullptr);
 
     //creating threads
     for(int i = 0; i < NUMBER; i++) {
@@ -88,7 +93,7 @@ int main(int Argc, char **Argv, char **env) {
 
     //joining threads
     for(int i = 0; i < NUMBER; i++) {
-        int temp = pthread_join(thread[i], NULL);
+        int temp = pthread_join(thread[i], nullptr);
 
         if(temp != 0) {
             std::cout << "Joining thread " << i << " failed\n";
@@ -97,21 +102,16 @@ int main(int Argc, char **Argv, char **env) {
     }
 
     pthread_mutex_destroy(&mutex);
+    clock_gettime(CLOCK_REALTIME, &end);
 
-    clock_gettime(CLOCK_REALTIME, &END);
+    timer = end.tv_sec - begin.tv_sec; //seconds
+    timer += (end.tv_nsec - begin.tv_nsec) / double(DENOMINATOR); //nanoseconds
 
-    TIMER = END.tv_sec - BEGIN.tv_sec; //seconds
-    TIMER += (END.tv_nsec - BEGIN.tv_nsec) / 1000000000.0; //nanoseconds
-
-  
     for(int i = 0; i < NUMBER; i++) {
-        std::cout << "Time spent in thread #" << i << " equals to " << std::fixed << std::setprecision(10) << arg[i].time << " seconds\n";
+        std::cout << "Time spent in thread " << i << " equals to " << std::fixed << std::setprecision(10) << arg[i].time << " seconds\n";
     }
   
-
-    std::cout << "Total spent time = " << std::fixed << std::setprecision(10) << TIMER << " seconds\n";
-
-   
+    std::cout << "Total spent time = " << std::fixed << std::setprecision(10) << timer << " seconds\n";
     std::cout << "Integral equals to " << RESULT << "\n";
    
     delete[] id;
@@ -121,28 +121,33 @@ int main(int Argc, char **Argv, char **env) {
     return 0;
 }
 
+// function to be integrated
+double function(const double x) {
+    return x * exp(-x);
+}
+
 void* thread_routine(void *Argument) {
     //timer
-    struct timespec BEGIN, END; //-lrt key is needed -> time_t tv_sec and long tv_nsec
-    double TIMER;
+    struct timespec begin = {}, end = {}; 
+    double timer(0.0);
 
-    clock_gettime(CLOCK_REALTIME, &BEGIN);
+    clock_gettime(CLOCK_REALTIME, &begin);
 
     Arg *arg = (Arg*) Argument  ;
 
-    double LOCAL_RESULT = 0;
-    long LOCAL_RANGE = (GRid - 1) / NUMBER;
+    double local_result(0.0);
+    long local_range = (Grid - 1) / NUMBER;
 
-    double h = (B - A) / ((double) (GRid - 1)); //step of integration
+    double h = (B - A) / ((double) (Grid - 1)); //step of integration
 
-    for(long i = 0; i < LOCAL_RANGE; i++) {
-        LOCAL_RESULT += (function(A + (LOCAL_RANGE * (arg->id) + i) * h) +
-                         function(A + (LOCAL_RANGE * (arg->id) + (i + 1)) * h)) * 0.5 * h;
+    for(long i = 0; i < local_range; i++) {
+        local_result += (function(A + (local_range * (arg->id) + i) * h) +
+                         function(A + (local_range * (arg->id) + (i + 1)) * h)) * 0.5 * h;
     }
 
     if((arg->id) == 0) {
-        for(long i = 0; i + NUMBER * LOCAL_RANGE + 1 < GRid; i++) {
-            LOCAL_RESULT += (function(B - i * h) +
+        for(long i = 0; i + NUMBER * local_range + 1 < Grid; i++) {
+            local_result += (function(B - i * h) +
                              function(B - (i + 1) * h)) * 0.5 * h;
         }
     }
@@ -151,48 +156,16 @@ void* thread_routine(void *Argument) {
 
     pthread_mutex_lock(&mutex); //collisions avoidance
 
-    RESULT += LOCAL_RESULT;
+    RESULT += local_result;
 
     pthread_mutex_unlock(&mutex); //collisions avoidance
 
-    clock_gettime(CLOCK_REALTIME, &END);
+    clock_gettime(CLOCK_REALTIME, &end);
 
-    TIMER = END.tv_sec - BEGIN.tv_sec; //seconds
-    TIMER += (END.tv_nsec - BEGIN.tv_nsec) / 1000000000.0; //nanoseconds
+    timer = end.tv_sec - begin.tv_sec; //seconds
+    timer += (end.tv_nsec - begin.tv_nsec) / double(DENOMINATOR); //nanoseconds
 
-    arg->time = TIMER;
+    arg->time = timer;
 
-    pthread_exit(NULL);
-}
-
-double function(const double x) {
-    return x * exp(x);
-}
-
-long int ReadArg(char * str)
-{
-    char* endptr;
-    errno = 0;
-
-    long int number = strtol(str, &endptr, 10);
-
-    
-    if ((errno == ERANGE && (number == LONG_MAX || number == LONG_MIN)) || (errno != 0 && number == 0)) 
-    {
-            perror("strtol");
-            exit(EXIT_FAILURE);
-    }
-
-    if (endptr == str)
-    {
-            fprintf(stderr, "Error!\n");
-            exit(EXIT_FAILURE);
-    }
-    if (*endptr != '\0')
-    {
-            fprintf(stderr, "Error!\n");
-            exit(EXIT_FAILURE);
-    }
-
-    return number;
+    pthread_exit(nullptr);
 }

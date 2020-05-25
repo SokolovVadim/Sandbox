@@ -9,12 +9,13 @@
 #include <iomanip>
 
 static long RESULT = 0;
+enum { DENOMINATOR = 1000000000 };
 
 struct Arg
 {
     int id;
     int part;
-    int time;
+    double time;
     pthread_mutex_t *mutex;
 };
 
@@ -23,10 +24,10 @@ long int ReadArg(char * str);
 
 int main(int argc, char **argv, char **env) {
     //timer
-    struct timespec BEGIN, END; 
-    double TIMER;
+    struct timespec begin, end; 
+    double timer;
 
-    clock_gettime(CLOCK_REALTIME, &BEGIN);
+    clock_gettime(CLOCK_REALTIME, &begin);
 
     //check input argument
     if(argc != 3) {
@@ -34,15 +35,15 @@ int main(int argc, char **argv, char **env) {
         return EXIT_FAILURE;
     }
    
-    long int NUMBER = ReadArg(argv[1]);
+    long int number = ReadArg(argv[1]);
     long int N = ReadArg(argv[2]);
 
-    int *id = new int[NUMBER];
-    for(int i = 0; i < NUMBER; i++) {
+    int *id = new int[number];
+    for(int i = 0; i < number; i++) {
         id[i] = i;
     }
 
-    pthread_t *thread = new pthread_t[NUMBER];
+    pthread_t *thread = new pthread_t[number];
     pthread_attr_t attr;
 
     //initialize and set the thread attributes
@@ -50,9 +51,9 @@ int main(int argc, char **argv, char **env) {
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
 
-    Arg *arg = new Arg[NUMBER];//= (ARG*) malloc(sizeof(ARG) * NUMBER); //arguments which sent to each thread
+    Arg *arg = new Arg[number];//= (ARG*) malloc(sizeof(ARG) * number); //arguments which sent to each thread
 
-    for(long i = N - (N % NUMBER) + 1; i <= N; i++) { //sum of the rest of members
+    for(long i = N - (N % number) + 1; i <= N; i++) { //sum of the rest of members
         RESULT += i;
     }
 
@@ -60,9 +61,9 @@ int main(int argc, char **argv, char **env) {
     pthread_mutex_init(&mutex, nullptr);
 
     //creating threads
-    for(int i = 0; i < NUMBER; i++) {
+    for(int i = 0; i < number; i++) {
         arg[i].id = i; //ID of each thread
-        arg[i].part = N / NUMBER; //number of members for each thread to sum
+        arg[i].part = N / number; //number of members for each thread to sum
         arg[i].mutex = &mutex; //mutex which will help to avoid collisions
         int temp = pthread_create(&thread[i], &attr, thread_routine, (void*) &arg[i]);
 
@@ -73,7 +74,7 @@ int main(int argc, char **argv, char **env) {
     }
 
     //joining threads
-    for(int i = 0; i < NUMBER; i++) {
+    for(int i = 0; i < number; i++) {
         int temp = pthread_join(thread[i], nullptr);
 
         if(temp != 0) {
@@ -84,16 +85,16 @@ int main(int argc, char **argv, char **env) {
 
     pthread_mutex_destroy(&mutex);
 
-    clock_gettime(CLOCK_REALTIME, &END);
+    clock_gettime(CLOCK_REALTIME, &end);
 
-    TIMER = END.tv_sec - BEGIN.tv_sec; //seconds
-    TIMER += (END.tv_nsec - BEGIN.tv_nsec) / 1000000000.0; //nanoseconds
+    timer = end.tv_sec - begin.tv_sec; // in seconds
+    timer += (end.tv_nsec - begin.tv_nsec) / double(DENOMINATOR); // in nanoseconds
 
-    for(int i = 0; i < NUMBER; i++) {
+    for(int i = 0; i < number; i++) {
         std::cout << "Time spent in thread " << i << " is equal to " << std::fixed << std::setprecision(10) << arg[i].time << " seconds\n";
     }
 
-    std::cout << "Total spent time = " << std::fixed << std::setprecision(10) << TIMER << " seconds\n";
+    std::cout << "Total spent time = " << std::fixed << std::setprecision(10) << timer << " seconds\n";
     std::cout << "Sum of " << N << " numbers is equal to " << RESULT << "\n";
 
     delete[] id;
@@ -103,35 +104,32 @@ int main(int argc, char **argv, char **env) {
     return 0;
 }
 
-void* thread_routine(void *argument) {
-    //timer
-    struct timespec BEGIN, END; 
-    double TIMER;
 
-    clock_gettime(CLOCK_REALTIME, &BEGIN);
+void* thread_routine(void *argument) {
+    //time measurement
+    struct timespec begin = {}, end = {}; 
+    double timer;
+
+    clock_gettime(CLOCK_REALTIME, &begin);
 
     Arg *arg = (Arg*) argument;
+    long int local_result(0);
 
-    long LOCAL_RESULT = 0;
-
-    for(long i = arg->id * arg->part + 1; i <= (arg->id + 1) * arg->part; i++) {
-        LOCAL_RESULT += i;
+    for(long int i = arg->id * arg->part + 1; i <= (arg->id + 1) * arg->part; i++) {
+        local_result += i;
     }
 
     pthread_mutex_t mutex = (pthread_mutex_t) *(arg->mutex);
-
     pthread_mutex_lock(&mutex); //collisions avoidance
 
-    RESULT += LOCAL_RESULT;
+    RESULT += local_result;
 
     pthread_mutex_unlock(&mutex); //collisions avoidance
+    clock_gettime(CLOCK_REALTIME, &end);
 
-    clock_gettime(CLOCK_REALTIME, &END);
-
-    TIMER = END.tv_sec - BEGIN.tv_sec; //seconds
-    TIMER += (END.tv_nsec - BEGIN.tv_nsec) / 1000000000.0; //nanoseconds
-
-    arg->time = TIMER;
+    timer = end.tv_sec - begin.tv_sec; //seconds
+    timer += (end.tv_nsec - begin.tv_nsec) / double(DENOMINATOR); //nanoseconds
+    arg->time = timer;
 
     pthread_exit(nullptr);
 }

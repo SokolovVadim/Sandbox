@@ -1,0 +1,13 @@
+1
+2 2 3
+pasta 2
+soup 3
+Potatos 2
+potato 10
+sault 1
+Watermelon_juice 2
+watermelon 1
+sugar 3
+Cabbage 2
+Pork 2
+Lettuce 2

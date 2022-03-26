@@ -3,6 +3,7 @@ import json
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 def plot_calendar(calendar):
     print('plotting calendar ...')
@@ -16,23 +17,32 @@ def plot_calendar(calendar):
     data = dict(sorted(data.items()))
     print(data)
     heat = []
+    days = []
+    months = set()
     for key, value in data.items():
         date = key.split('.')
         day = date[0]
         month = date[1]
         year = date[2]
+        days.append(int(day))
+        months.add(month)
 
         cumulative_date = int(day) + int(month) * 30 + int(year) * 365
         print('month:', int(month), 'cumulative_date:', cumulative_date)
         if value == 'low':
-            heat.append(1)
+            heat.append(-0.5)
         if value == 'normal':
-            heat.append(0.5)
-        if value == 'well':
             heat.append(0)
+        if value == 'well':
+            heat.append(0.5)
     heat = [heat]
     print(heat)
-    plt.imshow(heat, cmap='summer', interpolation='nearest')
+    plt.title('2022')
+    x_axis_labels = days # labels for x-axis
+    y_axis_labels = months # labels for y-axis
+
+    # create seabvorn heatmap with required labels
+    sns.heatmap(heat, xticklabels=x_axis_labels, yticklabels=y_axis_labels, cbar_kws={"orientation": "horizontal"}, cmap="Greens")
     plt.show()
 
 # if date is not specified, add today's date

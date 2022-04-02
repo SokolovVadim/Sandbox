@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from collections import defaultdict
 
 def plot_calendar(calendar):
     print('plotting calendar ...')
@@ -15,31 +16,41 @@ def plot_calendar(calendar):
             print('reading err')
             return
     data = dict(sorted(data.items()))
-    print(data)
-    heat = []
+    for date, wellbeing in data.items():
+        print(date, wellbeing)
+    max_month_len = 31
     days = []
     months = set()
+    heat_dict = defaultdict(list)
     for key, value in data.items():
         date = key.split('.')
         day = date[0]
         month = date[1]
         year = date[2]
         days.append(int(day))
-        months.add(month)
+        months.add(int(month))
 
         cumulative_date = int(day) + int(month) * 30 + int(year) * 365
         print('month:', int(month), 'cumulative_date:', cumulative_date)
         if value == 'low':
-            heat.append(-0.5)
+            if month not in heat_dict:
+                heat_dict[month] = [-1] * max_month_len
+            heat_dict[month][int(day) - 1] = -0.5#append(-0.5)
         if value == 'normal':
-            heat.append(0)
+            if month not in heat_dict:
+                heat_dict[month] = [-1] * max_month_len 
+            heat_dict[month][int(day) - 1] = 0
         if value == 'well':
-            heat.append(0.5)
-    heat = [heat]
-    print(heat)
+            if month not in heat_dict:
+                heat_dict[month] = [-1] * max_month_len
+            heat_dict[month][int(day) - 1] = 0.5 
+
+    
+    heat = list(heat_dict.values())
     plt.title('2022')
+    days = list(range(1, 32))
     x_axis_labels = days # labels for x-axis
-    y_axis_labels = months # labels for y-axis
+    y_axis_labels = heat_dict.keys() # labels for y-axis
 
     # create seabvorn heatmap with required labels
     sns.heatmap(heat, xticklabels=x_axis_labels, yticklabels=y_axis_labels, cbar_kws={"orientation": "horizontal"}, cmap="Greens")
@@ -73,8 +84,6 @@ def add_day(day, marker):
 if __name__ == "__main__":
     # Instantiate the parser
     parser = argparse.ArgumentParser(description='Optional app description')
-
-    # Optional arguments
     parser.add_argument('--plot', type=str,
                     help='Plot the calendar')
     parser.add_argument('--add_day', type=str,

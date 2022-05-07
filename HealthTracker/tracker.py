@@ -44,7 +44,6 @@ def plot_calendar(calendar):
             if month not in heat_dict:
                 heat_dict[month] = [-1] * max_month_len
             heat_dict[month][int(day) - 1] = 0.5 
-
     
     heat = list(heat_dict.values())
     plt.title('2022')

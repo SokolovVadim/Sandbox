@@ -1,0 +1,4 @@
+Boot
+F9
+Boot from device
+*64.*
